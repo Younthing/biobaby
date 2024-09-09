@@ -1,0 +1,28 @@
+# Generated from create-biobaby.Rmd: do not edit by hand
+
+#' A dataset containing GWAS summary statistics
+#'
+#' @description This dataset contains summary statistics from a Genome-Wide Association Study (GWAS) with a p-value threshold of 5e-8. The data includes various attributes related to genetic variants, exposure information, and statistical measures.
+#'
+#' @format A data frame with multiple rows and 14 variables:
+#' \describe{
+#'   \item{se.exposure}{Standard error of the exposure}
+#'   \item{chr.exposure}{Chromosome number of the exposure}
+#'   \item{pos.exposure}{Position of the exposure on the chromosome}
+#'   \item{pval.exposure}{P-value of the exposure}
+#'   \item{samplesize.exposure}{Sample size used for the exposure analysis}
+#'   \item{beta.exposure}{Beta coefficient (effect size) of the exposure}
+#'   \item{id.exposure}{Unique identifier for the exposure}
+#'   \item{SNP}{Single Nucleotide Polymorphism (SNP) identifier}
+#'   \item{effect_allele.exposure}{Effect allele of the exposure}
+#'   \item{other_allele.exposure}{Non-effect allele of the exposure}
+#'   \item{eaf.exposure}{Effect allele frequency of the exposure}
+#'   \item{exposure}{Name or description of the exposure}
+#'   \item{mr_keep.exposure}{Indicator if the variant is kept for Mendelian Randomization analysis}
+#'   \item{pval_origin.exposure}{Origin of the p-value for the exposure}
+#'   \item{data_source.exposure}{Source of the data}
+#' }
+#'
+#' @source Data obtained from GWAS summary statistics with a p-value threshold of 5e-8.
+"exp_p5e8_all"
+
