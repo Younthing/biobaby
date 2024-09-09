@@ -14,6 +14,7 @@
 #'
 #' @note 请确保输入数据框的格式正确。
 #' @keywords data processing merge
+#' @import crayon stringr dplyr tidyr
 #' @export
 process_data <- function(exp_data, ao_data, remove_eqtl = TRUE, filter_population = "European") {
 
@@ -32,10 +33,6 @@ process_data <- function(exp_data, ao_data, remove_eqtl = TRUE, filter_populatio
 
   # 处理结局数据
   process_population_data <- function(ao_data, filter_population = "European") {
-    if (nrow(problems(ao_data)) > 0) {
-      warning(yellow("CSV文件解析时存在问题，请调用problems()查看详细信息。"))
-    }
-
     if (!is.null(filter_population)) {
       ao_data <- ao_data %>%
         filter(population == filter_population)
@@ -65,3 +62,4 @@ process_data <- function(exp_data, ao_data, remove_eqtl = TRUE, filter_populatio
 
   return(final_data)
 }
+

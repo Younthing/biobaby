@@ -1,6 +1,6 @@
 Package: biobaby
 Title: Mendelian Randomization Variable Selection
-Version: 0.0.1
+Version: 0.1.0
 Authors@R: 
     person("Fan", "Xing", , "fanxingfu3344@gmail.com", role = c("aut", "cre"))
 Description: An R package for the batch selection of variables used in
@@ -12,7 +12,6 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Imports: 
-    base,
     crayon,
     digest,
     dplyr,
@@ -27,4 +26,4 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 LitrVersionUsed: 0.9.2
-LitrId: 1544c24034d2f78cc34f155cbb43cd68
+LitrId: 0844c421f08c3d5b779026836424dacb

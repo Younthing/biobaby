@@ -352,42 +352,43 @@ display: none;
 </div>
 
 
-<p>为了使 README 看起来更经典，可以对其进行以下一些调整：</p>
-<pre class="markdown"><code># README
-
-## 项目简介
-
-本项目包含了一组用于进行孟德尔随机化 (MR) 分析的批量有效暴露筛选的方法。
-
-## 依赖
-
-运行脚本需要以下 R 包：
-
-- crayon
-- TwoSampleMR
-- digest
-- furrr
-- dplyr
-- tidyr
-- stringr
-- openxlsx
-
-## 函数列表
-
-### process_data
-
-处理暴露和结局数据，根据指定条件进行筛选并合并。
-
-- **exp_data**: 数据框，暴露数据。
-- **ao_data**: 数据框，结局数据。
-- **remove_eqtl**: 逻辑值，是否移除暴露数据中的 eQTL，默认为`TRUE`。
-- **filter_population**: 字符串，指定结局数据中需要筛选的人群，默认为`&quot;European&quot;`。
-
-示例：
-
-```r
-result_data &lt;- process_data(exp_data, ao_data, remove_eqtl = TRUE, filter_population = &quot;European&quot;)
-```</code></pre>
+<div id="readme" class="section level1">
+<h1>README</h1>
+<div id="项目简介" class="section level2">
+<h2>项目简介</h2>
+<p>本项目包含了一组用于进行孟德尔随机化 (MR)
+分析的批量有效暴露筛选的方法。</p>
+</div>
+<div id="依赖" class="section level2">
+<h2>依赖</h2>
+<p>运行脚本需要以下 R 包：</p>
+<ul>
+<li>crayon</li>
+<li>TwoSampleMR</li>
+<li>digest</li>
+<li>furrr</li>
+<li>dplyr</li>
+<li>tidyr</li>
+<li>stringr</li>
+<li>openxlsx</li>
+</ul>
+</div>
+<div id="函数列表" class="section level2">
+<h2>函数列表</h2>
+<div id="process_data" class="section level3">
+<h3>process_data</h3>
+<p>处理暴露和结局数据，根据指定条件进行筛选并合并。</p>
+<ul>
+<li><strong>exp_data</strong>: 数据框，暴露数据。</li>
+<li><strong>ao_data</strong>: 数据框，结局数据。</li>
+<li><strong>remove_eqtl</strong>: 逻辑值，是否移除暴露数据中的
+eQTL，默认为<code>TRUE</code>。</li>
+<li><strong>filter_population</strong>:
+字符串，指定结局数据中需要筛选的人群，默认为<code>&quot;European&quot;</code>。</li>
+</ul>
+<p>示例：</p>
+<pre class="r"><code>result_data &lt;- process_data(exp_data, ao_data, remove_eqtl = TRUE, filter_population = &quot;European&quot;)</code></pre>
+</div>
 <div id="get_cached_results" class="section level3">
 <h3>get_cached_results</h3>
 <p>分片查询 SNP 信息，并将结果缓存到本地以避免重复查询。</p>
@@ -426,12 +427,11 @@ outcome &lt;- get_cached_results(snps, &quot;ukb-e-30800_CSA&quot;, cache_dir = 
 <p>示例：</p>
 <pre class="r"><code>export_results(final_results, output_file = &quot;results.xlsx&quot;)</code></pre>
 </div>
+</div>
 <div id="示例" class="section level2">
 <h2>示例</h2>
-<pre class="r"><code>exp_file &lt;- &quot;exp_data_2023.4.3_p5e8_idALL.rds&quot;
-ao_file &lt;- &quot;ao_2024_4_23.csv&quot;
-exp_data &lt;- readRDS(exp_file)
-ao_data &lt;- read.csv(ao_file)
+<pre class="r"><code>data(exp_p5e8_all)
+data(all_outcomes)
 
 exp_data &lt;- process_data(exp_data, ao_data)
 snps &lt;- unique(exp_data$SNP[1:5000])
@@ -445,6 +445,7 @@ export_results(final_results)</code></pre>
 <li>请确保输入数据框的格式正确。</li>
 <li>注意 API 查询限制（每 10 分钟 10000 次查询）。</li>
 </ul>
+</div>
 </div>
 
 
