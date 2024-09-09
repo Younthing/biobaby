@@ -1,0 +1,506 @@
+---
+title: "Creating the ``r params$package_name`` R package"
+author: "Fan Xing"
+date: "2024-11-11"
+knit: litr::render
+output: litr::litr_html_document
+params:
+  package_name: "biobaby"
+  package_parent_dir: "." # <-- relative to this file's location
+---
+
+<!-- This Rmd file contains all the code needed to define an R package.  Press "Knit" in RStudio or more generally run `litr::render("name-of-this-file.Rmd")` to generate the R package.  Remember that when you want to modify anything about the R package, you should modify this document rather than the package that is outputted.
+-->
+
+## Package setup
+
+We start by specifying the information needed in the DESCRIPTION file of the R package.
+
+```{r package-setup, message=FALSE, results='hide'}
+usethis::create_package(
+  path = ".",
+  fields = list(
+    Package = params$package_name,
+    Version = "0.0.1",
+    Title = "Mendelian Randomization Variable Selection",
+    Description = "An R package for the batch selection of variables used in Mendelian Randomization studies. This package includes functions to streamline the selection process, ensuring robust and reliable variable choices for subsequent analyses.",
+    `Authors@R` = person(
+      given = "Fan",
+      family = "Xing",
+      email = "fanxingfu3344@gmail.com",
+      role = c("aut", "cre")
+      )
+  )
+)
+usethis::use_mit_license(copyright_holder = "Fan Xing")
+```
+
+## Now to the package itself
+
+### 添加 R 包
+
+```{r}
+usethis::use_package("base")
+usethis::use_package("crayon")
+usethis::use_package("TwoSampleMR")
+usethis::use_package("stringr")
+usethis::use_package("digest")
+usethis::use_package("furrr")
+usethis::use_package("dplyr")
+usethis::use_package("tidyr")
+```
+
+### load data
+
+#### 加载数据使用绝对地址
+
+```{r}
+# 目录使用绝对地址
+exp_p5e8_all <- readRDS("/home/fanxi/projects/learn/rpackage/exp_data_2023.4.3_p5e8_idALL.rds")
+all_outcomes = read.csv("/home/fanxi/projects/learn/rpackage/ao_2024_4_23.csv")
+```
+
+#### 注册数据
+
+```{r}
+usethis::use_data(exp_p5e8_all,all_outcomes,overwrite =TRUE)
+
+```
+
+#### 添加数据文档
+
+```{r}
+#' A dataset containing all OpenGWAS outcomes
+#'
+#' @description This dataset lists all available outcome IDs obtained from the OpenGWAS database, primarily used for Mendelian Randomization analysis. The data was retrieved using the `available_outcomes()` function from the `TwoSampleMR` package. It includes important information related to each outcome, aiding researchers in selecting appropriate outcomes for causal inference analysis.
+#'
+#' @format A data frame with multiple rows and 24 variables:
+#' \describe{
+#'   \item{id}{Unique identifier for each outcome}
+#'   \item{trait}{Name of the trait}
+#'   \item{group_name}{Name of the study group}
+#'   \item{year}{Year of publication}
+#'   \item{consortium}{Name of the consortium}
+#'   \item{author}{Lead author of the study}
+#'   \item{sex}{Sex of the participants}
+#'   \item{population}{Target population of the study}
+#'   \item{sample_size}{Sample size of the study}
+#'   \item{build}{Genome build version used}
+#'   \item{subcategory}{Subcategory of the outcome}
+#'   \item{category}{Main category of the outcome}
+#'   \item{doi}{Digital Object Identifier (DOI) of the study}
+#'   \item{unit}{Unit of measurement for the trait}
+#'   \item{ontology}{Ontology description of the trait}
+#'   \item{note}{Additional notes}
+#'   \item{ncase}{Number of cases}
+#'   \item{ncontrol}{Number of controls}
+#'   \item{mr}{Indicator if the study is suitable for Mendelian Randomization}
+#'   \item{pmid}{PubMed ID of the related publication}
+#'   \item{nsnp}{Number of SNPs used in the study}
+#'   \item{coverage}{Coverage of the study}
+#'   \item{study_design}{Type of study design}
+#'   \item{priority}{Priority of the study}
+#'   \item{sd}{Standard deviation of the measurements}
+#' }
+#'
+#' @source Data obtained from the OpenGWAS database using the `TwoSampleMR` package.
+"all_outcomes"
+```
+
+```{r}
+#' A dataset containing GWAS summary statistics
+#'
+#' @description This dataset contains summary statistics from a Genome-Wide Association Study (GWAS) with a p-value threshold of 5e-8. The data includes various attributes related to genetic variants, exposure information, and statistical measures.
+#'
+#' @format A data frame with multiple rows and 14 variables:
+#' \describe{
+#'   \item{se.exposure}{Standard error of the exposure}
+#'   \item{chr.exposure}{Chromosome number of the exposure}
+#'   \item{pos.exposure}{Position of the exposure on the chromosome}
+#'   \item{pval.exposure}{P-value of the exposure}
+#'   \item{samplesize.exposure}{Sample size used for the exposure analysis}
+#'   \item{beta.exposure}{Beta coefficient (effect size) of the exposure}
+#'   \item{id.exposure}{Unique identifier for the exposure}
+#'   \item{SNP}{Single Nucleotide Polymorphism (SNP) identifier}
+#'   \item{effect_allele.exposure}{Effect allele of the exposure}
+#'   \item{other_allele.exposure}{Non-effect allele of the exposure}
+#'   \item{eaf.exposure}{Effect allele frequency of the exposure}
+#'   \item{exposure}{Name or description of the exposure}
+#'   \item{mr_keep.exposure}{Indicator if the variant is kept for Mendelian Randomization analysis}
+#'   \item{pval_origin.exposure}{Origin of the p-value for the exposure}
+#'   \item{data_source.exposure}{Source of the data}
+#' }
+#'
+#' @source Data obtained from GWAS summary statistics with a p-value threshold of 5e-8.
+"exp_p5e8_all"
+
+```
+
+### Define a function
+
+#### 预处理
+
+```{r}
+#' @title 处理并合并暴露和结局数据
+#' @description 此函数处理暴露数据和结局数据，并根据指定条件进行筛选和合并。
+#'
+#' @param exp_data 暴露数据，数据框。
+#' @param ao_data 全部结局数据，数据框。
+#' @param remove_eqtl 逻辑值，是否移除暴露数据中的eQTL，默认为TRUE。
+#' @param filter_population 字符串，指定结局数据中需要筛选的人群，默认为"European"。
+#' @return 合并后的筛选数据，数据框。
+#' @examples
+#' result_data <- process_data(exp_data, ao_data, remove_eqtl = TRUE, filter_population = "European")
+#' @details 此函数首先处理暴露数据，然后处理结局数据，最后合并筛选后的数据。
+#'
+#' @note 请确保输入数据框的格式正确。
+#' @keywords data processing merge
+#' @export
+process_data <- function(exp_data, ao_data, remove_eqtl = TRUE, filter_population = "European") {
+
+  # 处理暴露数据
+  process_exposure_data <- function(exp_data, remove_eqtl = TRUE) {
+    cat(green("总共的暴露信息数量:"), yellow(length(unique(exp_data$id.exposure))), "\n")
+
+    if (remove_eqtl) {
+      exp_data <- exp_data %>%
+        filter(!str_detect(id.exposure, "eqtl-a"))
+      cat(green("去掉eQTL后的暴露信息数量:"), yellow(length(unique(exp_data$id.exposure))), "\n")
+    }
+
+    return(exp_data)
+  }
+
+  # 处理结局数据
+  process_population_data <- function(ao_data, filter_population = "European") {
+    if (nrow(problems(ao_data)) > 0) {
+      warning(yellow("CSV文件解析时存在问题，请调用problems()查看详细信息。"))
+    }
+
+    if (!is.null(filter_population)) {
+      ao_data <- ao_data %>%
+        filter(population == filter_population)
+      cat(green(paste0(filter_population, "人群结局数据trait数量:")), yellow(n_distinct(ao_data$id)), "\n")
+    }
+
+    return(ao_data)
+  }
+
+  # 合并筛选后的数据
+  merge_data <- function(exp_data, ao_data) {
+    filtered_data <- exp_data %>%
+      filter(id.exposure %in% ao_data$id)
+
+    cat(green("筛选后的全部暴露的SNP数量:"), yellow(nrow(filtered_data)), "\n")
+
+    return(filtered_data)
+  }
+
+  # 处理数据
+  exp_data <- process_exposure_data(exp_data, remove_eqtl)
+  ao_data <- ao_data %>%
+    process_population_data(filter_population)
+
+  # 合并数据
+  final_data <- merge_data(exp_data, ao_data)
+
+  return(final_data)
+}
+```
+
+#### gwas api
+
+```{r}
+
+#' @title 分片查询并缓存结果到本地文件
+#' @description 此函数将SNP列表分片查询API，并将结果缓存到本地文件，以避免重复查询。
+#'
+#' @param snps 字符向量，表示要查询的SNP字符串或列表，比如ukb-e-30800_CSA。
+#' @param outcomes 字符向量，表示要查询的结局列表。
+#' @param chunk_size 整数，每个分片的SNP数量，默认为1000。
+#' @param cache_dir 字符串，缓存文件的存储目录，默认为"cache"。
+#' @return 所有分片查询的合并结果，数据框。
+#' @examples
+#' cache_dir <- "cache"
+#' snps <- unique(exp_data$SNP[1:5000])
+#' outcome <- get_cached_results(snps, "ukb-e-30800_CSA", cache_dir = cache_dir)
+#' @details 此函数首先将SNP列表分片查询API，如果查询结果已缓存，则使用缓存结果，否则进行API查询并缓存结果。最后返回所有分片查询的合并结果。
+#'
+#' @note 请确保输入的SNP和结局列表是有效的。
+#' @keywords data query caching
+#' @export
+#'
+get_cached_results <- function(snps, outcomes, chunk_size = 1000, cache_dir = "cache") {
+
+  # 定义一个分片查询的函数
+  query_api <- function(snps, outcomes) {
+    result <- extract_outcome_data(
+      snps = snps,
+      outcomes = outcomes,
+      proxies = FALSE,
+      palindromes = 1,
+      maf_threshold = 0.3,
+      splitsize = 5000,
+      proxy_splitsize = 500
+    )
+    return(result)
+  }
+
+  unique_snps <- unique(snps)
+  n <- length(unique_snps)
+  cat(blue("注意10分钟上限1万次查询，您的查询数量为: "), yellow(n), "\n")
+
+  # 创建缓存目录（如果不存在）
+  if (!dir.exists(cache_dir)) {
+    cat(blue("新建缓存目录: "), yellow(cache_dir), "\n")
+    dir.create(cache_dir)
+  }
+
+  total_chunks <- ceiling(n / chunk_size)
+
+  for (i in seq(1, n, by = chunk_size)) {
+    chunk <- unique_snps[i:min(i + chunk_size - 1, n)]
+
+    # 生成缓存文件路径
+    cache_key <- digest(paste0(chunk,collapse = "_"), algo = "sha1")
+    cache_file <- file.path(cache_dir, paste0(cache_key, ".rds"))
+
+    chunk_index <- ceiling(i / chunk_size)
+    cat(green("处理分片 "), yellow(chunk_index), green(" / "), yellow(total_chunks), "\n")
+
+    # 检查是否已经缓存
+    if (file.exists(cache_file)) {
+      cat(blue("使用本地缓存结果，分片范围: "), yellow(paste(i, "到", min(i + chunk_size - 1, n))), "\n")
+      cached_result <- readRDS(cache_file)
+      api_result <- cached_result
+    } else {
+      cat(green("正在查询API，分片范围: "), yellow(paste(i, "到", min(i + chunk_size - 1, n))), "\n")
+
+      # 如果没有缓存则查询API
+      api_result <- query_api(chunk, outcomes)
+      # 如果API返回非空结果则缓存到本地文件
+      if (!is.null(api_result)) {
+        saveRDS(api_result, cache_file)
+        cat(green("查询成功并缓存结果到本地文件，分片范围: "), yellow(paste(i, "到", min(i + chunk_size - 1, n))), "\n")
+      } else {
+        cat(red("API查询返回空结果，分片范围: "), yellow(paste(i, "到", min(i + chunk_size - 1, n))), "\n")
+      }
+    }
+
+    # 处理结果 (这里假设你需要将结果保存到一个列表中)
+    if (i == 1) {
+      final_result <- api_result
+    } else {
+      final_result <- bind_rows(final_result, api_result)
+    }
+  }
+
+  return(final_result)
+}
+
+```
+
+#### 并行计算
+
+```{r}
+
+
+perform_mr_analysis <- function(exp_data, outcome_data, cores = availableCores() / 2) {
+  # Set up parallel processing plan
+  plan(multisession, workers = cores)
+
+  exp_data = exp_data[which(exp_data$SNP %in% outcome_data$SNP), ]
+
+  # 过滤掉弱工具变量 Fstat < 10
+
+  calculate_F <- function(dat) {
+    dat$Fstat <- (abs(dat$beta.exposure) / dat$se.exposure)^2
+    dat
+  }
+  exp_data = calculate_F(exp_data)
+
+  exp_data <- exp_data %>% filter(Fstat >= 10)
+
+  # Function to harmonize data
+  harmonize_exposure_data <- function(exposure_data, outcome_data) {
+    tryCatch({
+      TwoSampleMR::harmonise_data(exposure_dat = exposure_data, outcome_dat = outcome_data)
+    }, error = function(e) {
+      message("Error harmonizing data: ", e$message)
+      NULL
+    })
+  }
+
+  # Harmonize data in parallel
+  exposure_data_list <- split(exp_data, exp_data$id.exposure)
+  harmonized_data_list <- future_map(exposure_data_list, harmonize_exposure_data, outcome_data = outcome_data)
+
+  # Combine harmonized data and filter, ensuring only data frames are used
+  combined_data <- harmonized_data_list %>%
+    keep(is.data.frame) %>%
+    bind_rows() %>%
+    filter(mr_keep) %>%
+    split(.$id.exposure)
+
+  # Rename exposure groups and remove those with fewer than 3 SNPs
+  named_data <- combined_data %>%
+    set_names(paste0("A", seq_along(.))) %>%
+    discard(~ nrow(.x) < 3)
+
+  # Function to perform MR analysis based on heterogeneity results
+  perform_mr_analysis <- function(data) {
+    heterogeneity_result <- mr_heterogeneity(data)
+    method_list <- if (heterogeneity_result$Q_pval[2] < 0.05) {
+      c("mr_egger_regression", "mr_weighted_median", "mr_ivw_mre")
+    } else {
+      c("mr_egger_regression", "mr_weighted_median", "mr_ivw_fe")
+    }
+
+    mr(data, method_list = method_list)
+  }
+
+  # Perform MR analysis in parallel
+  mr_results_list <- future_map(named_data, perform_mr_analysis)
+
+  # Combine MR results and round p-values
+  combined_results <- mr_results_list %>%
+    keep(is.data.frame) %>%
+    bind_rows() %>%
+    mutate(pval = round(pval, 3))
+
+  # Function to evaluate MR results and annotate directions and p-values
+  evaluate_mr_results <- function(mr_result) {
+    if (!is.data.frame(mr_result)) {
+      stop("Expected a data frame for MR results but got ", class(mr_result))
+    }
+
+    mr_result %>%
+      mutate(
+        b_direction = if_else(abs(sum(sign(b))) == 3, NA_character_, "Inconsistent direction"),
+        p_no = case_when(
+          method == "MR Egger" & pval >= 0.05 ~ "MR Egger",
+          method == "Weighted median" & pval >= 0.05 ~ "Weighted median",
+          str_detect(method, "Inverse variance") & pval >= 0.05 ~ "IVW",
+          TRUE ~ " "
+        )
+      ) %>%
+      mutate(p_no = str_trim(paste(p_no, collapse = " ")))
+  }
+
+  # Apply evaluation function to all results using safely to handle potential errors
+  evaluated_results <- combined_results %>%
+    split(.$id.exposure) %>%
+    map(safely(evaluate_mr_results))
+
+  # Extract results and handle errors
+  evaluated_results <- evaluated_results %>%
+    map("result") %>%
+    compact() # Remove NULLs (errors)
+
+  # Combine evaluated results
+  final_results <- bind_rows(evaluated_results) %>%
+    filter(is.na(b_direction)) %>%
+    filter(!str_detect(p_no, "IVW"))
+
+  return(final_results)
+}
+
+```
+
+#### 保存逻辑
+
+```{r}
+
+export_results <- function(final_results, output_file = "results.xlsx") {
+  # Create a new workbook
+  workbook <- createWorkbook("自动暴露")
+
+  # Add worksheets to the workbook
+  addWorksheet(workbook, "Final Results", gridLines = FALSE)
+  addWorksheet(workbook, "Cleaned Exposures", gridLines = FALSE)
+
+  # Write data to the first worksheet
+  writeData(workbook,
+            sheet = "Final Results",
+            x = final_results,
+            rowNames = FALSE)
+
+  # Write data to the second worksheet
+  writeData(workbook,
+            sheet = "Cleaned Exposures",
+            x = final_results %>%
+              distinct(exposure) %>%
+              separate(exposure, into = c("exposure", "remove"), sep = "\\|") %>%
+              select(-remove),
+            rowNames = FALSE)
+
+  # Define a style for alternating rows
+  body_style <- createStyle(
+    border = "TopBottom",
+    bgFill = "#e3e9f4",
+    fgFill = "#e3e9f4"
+  )
+
+
+  # Set column width for the first column
+  setColWidths(workbook,
+               sheet = "Final Results",
+               cols = 1,
+               widths = 21)
+
+  # Save the workbook to a file
+  saveWorkbook(workbook,
+               file = output_file,
+               overwrite = TRUE)
+
+  # Message to confirm saving
+  message("Workbook saved as: ", output_file)
+}
+
+```
+
+Let's define a function for our R package:
+
+```{r}
+#' Say hello to someone
+#'
+#' @param name Name of a person
+#' @param exclamation Whether to include an exclamation mark
+#' @export
+say_hello <- function(name, exclamation = TRUE) {
+  paste0("Hello ", name, ifelse(exclamation, "!", "."))
+}
+```
+
+Code chunks whose first line starts with `#'` are added to the package.
+
+We can try running it.
+
+```{r}
+say_hello("Jacob")
+```
+
+That code chunk does not start with `#'`, so it is not added to the package.
+
+Let's write some tests to make sure the function behaves as desired:
+
+```{r}
+testthat::test_that("say_hello works", {
+  testthat::expect_equal(say_hello("Jacob"), "Hello Jacob!")
+  testthat::expect_equal(say_hello("Jacob", exclamation = FALSE), "Hello Jacob.")
+})
+```
+
+Code chunks that have one or more lines starting with `test_that(` (or `testthat::test_that(`) are added to the package as tests.
+
+## Documenting the package and building
+
+We finish by running commands that will document, build, and install the package. It may also be a good idea to check the package from within this file.
+
+```{r}
+litr::add_readme("/home/fanxi/projects/learn/rpackage/README.md")
+litr::document() # <-- use instead of devtools::document()
+# devtools::build()
+# devtools::install()
+# devtools::check(document = FALSE)
+```
